@@ -6,6 +6,8 @@ export type TimeUnit = 'year' | 'quarter' | 'month' | 'week' | 'day' | 'yearmont
 
 export type MarkType = 'auto' | 'bar' | 'line' | 'point' | 'area' | 'rect' | 'circle' | 'tick';
 
+export type SortOrder = 'ascending' | 'descending' | '-x' | '-y' | 'x' | 'y' | null;
+
 export interface DetectedField {
   name: string;
   type: FieldType;
@@ -16,6 +18,7 @@ export interface EncodingFieldConfig {
   field: DetectedField;
   aggregate: AggregateType;
   timeUnit: TimeUnit;
+  sort: SortOrder;
 }
 
 export type EncodingChannel = 'x' | 'y' | 'color' | 'size' | 'shape' | 'row' | 'column';
@@ -47,7 +50,8 @@ export type AppAction =
   | { type: 'TOGGLE_FIELD_TYPE'; fieldName: string }
   | { type: 'RESET_FOR_NEW_DATA' }
   | { type: 'SET_MARK_TYPE'; markType: MarkType }
-  | { type: 'SET_CHART_TITLE'; title: string | null };
+  | { type: 'SET_CHART_TITLE'; title: string | null }
+  | { type: 'SET_SORT'; channel: EncodingChannel; sort: SortOrder };
 
 // File upload types
 export interface FileUploadResult {

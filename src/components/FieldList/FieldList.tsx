@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { FieldPill } from './FieldPill';
 import type { FieldType } from '../../types';
@@ -9,8 +10,27 @@ const TYPE_INFO: { type: FieldType; label: string; color: string }[] = [
   { type: 'temporal', label: 'Temporal', color: 'var(--color-temporal)' },
 ];
 
+// Type order for sorting fields
+const TYPE_ORDER: Record<FieldType, number> = {
+  quantitative: 0,
+  temporal: 1,
+  ordinal: 2,
+  nominal: 3,
+};
+
 export function FieldList() {
   const { state } = useApp();
+
+  // Sort fields by type: quantitative, temporal, ordinal, nominal
+  const sortedFields = useMemo(() => {
+    return [...state.fields].sort((a, b) => {
+      const orderA = TYPE_ORDER[a.type];
+      const orderB = TYPE_ORDER[b.type];
+      if (orderA !== orderB) return orderA - orderB;
+      // Secondary sort by name within same type
+      return a.name.localeCompare(b.name);
+    });
+  }, [state.fields]);
 
   return (
     <aside
@@ -103,7 +123,7 @@ export function FieldList() {
           flex: 1,
         }}
       >
-        {state.fields.map((field, index) => (
+        {sortedFields.map((field, index) => (
           <FieldPill key={field.name} field={field} index={index} />
         ))}
       </div>

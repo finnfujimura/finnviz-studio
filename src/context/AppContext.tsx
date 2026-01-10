@@ -1,5 +1,5 @@
 import { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
-import type { AppState, AppAction, DetectedField, EncodingChannel, FieldType, AggregateType, TimeUnit, MarkType } from '../types';
+import type { AppState, AppAction, DetectedField, EncodingChannel, FieldType, AggregateType, TimeUnit, MarkType, SortOrder } from '../types';
 import { detectAllFields } from '../utils/fieldDetection';
 import carsData from '../../superstore.json';
 
@@ -27,7 +27,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
           [action.channel]: {
             field: action.field,
             aggregate: null,
-            timeUnit: action.field.type === 'temporal' ? 'year' : null
+            timeUnit: action.field.type === 'temporal' ? 'year' : null,
+            sort: null
           }
         },
       };
@@ -101,6 +102,17 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, markType: action.markType };
     case 'SET_CHART_TITLE':
       return { ...state, chartTitle: action.title };
+    case 'SET_SORT': {
+      const existingConfig = state.encodings[action.channel];
+      if (!existingConfig) return state;
+      return {
+        ...state,
+        encodings: {
+          ...state.encodings,
+          [action.channel]: { ...existingConfig, sort: action.sort },
+        },
+      };
+    }
     default:
       return state;
   }
@@ -112,6 +124,7 @@ interface AppContextType {
   removeField: (channel: EncodingChannel) => void;
   setAggregate: (channel: EncodingChannel, aggregate: AggregateType) => void;
   setTimeUnit: (channel: EncodingChannel, timeUnit: TimeUnit) => void;
+  setSort: (channel: EncodingChannel, sort: SortOrder) => void;
   setMarkType: (markType: MarkType) => void;
   setChartTitle: (title: string | null) => void;
   clearAll: () => void;
@@ -152,6 +165,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'SET_TIME_UNIT', channel, timeUnit });
   };
 
+  const setSort = (channel: EncodingChannel, sort: SortOrder) => {
+    dispatch({ type: 'SET_SORT', channel, sort });
+  };
+
   const setMarkType = (markType: MarkType) => {
     dispatch({ type: 'SET_MARK_TYPE', markType });
   };
@@ -181,7 +198,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AppContext.Provider value={{ state, assignField, removeField, setAggregate, setTimeUnit, setMarkType, setChartTitle, clearAll, toggleFieldType, loadData }}>
+    <AppContext.Provider value={{ state, assignField, removeField, setAggregate, setTimeUnit, setSort, setMarkType, setChartTitle, clearAll, toggleFieldType, loadData }}>
       {children}
     </AppContext.Provider>
   );

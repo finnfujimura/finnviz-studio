@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { EncodingChannel, DetectedField, FieldType, AggregateType, TimeUnit } from '../../types';
+import type { EncodingChannel, DetectedField, FieldType, AggregateType, TimeUnit, SortOrder } from '../../types';
 import { useApp } from '../../context/AppContext';
 
 const TYPE_COLORS: Record<FieldType, string> = {
@@ -55,13 +55,23 @@ const TIME_UNIT_OPTIONS: { value: TimeUnit; label: string }[] = [
   { value: 'day', label: 'Day' },
 ];
 
+const SORT_OPTIONS: { value: SortOrder; label: string }[] = [
+  { value: null, label: 'Default' },
+  { value: 'ascending', label: 'Ascending' },
+  { value: 'descending', label: 'Descending' },
+  { value: '-x', label: 'By X (desc)' },
+  { value: 'x', label: 'By X (asc)' },
+  { value: '-y', label: 'By Y (desc)' },
+  { value: 'y', label: 'By Y (asc)' },
+];
+
 interface EncodingShelfProps {
   channel: EncodingChannel;
   label: string;
 }
 
 export function EncodingShelf({ channel, label }: EncodingShelfProps) {
-  const { state, assignField, removeField, setAggregate, setTimeUnit } = useApp();
+  const { state, assignField, removeField, setAggregate, setTimeUnit, setSort } = useApp();
   const [isOver, setIsOver] = useState(false);
   const [isHoveredRemove, setIsHoveredRemove] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -70,6 +80,7 @@ export function EncodingShelf({ channel, label }: EncodingShelfProps) {
   const assignedField = encodingConfig?.field;
   const currentAggregate = encodingConfig?.aggregate ?? null;
   const currentTimeUnit = encodingConfig?.timeUnit ?? null;
+  const currentSort = encodingConfig?.sort ?? null;
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -344,6 +355,41 @@ export function EncodingShelf({ channel, label }: EncodingShelfProps) {
                 {TIME_UNIT_OPTIONS.map((option) => (
                   <option key={option.label} value={option.value ?? ''}>
                     {option.label}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {/* Sort dropdown for X and Y channels */}
+            {(channel === 'x' || channel === 'y') && (
+              <select
+                value={currentSort ?? ''}
+                onChange={(e) => {
+                  const value = e.target.value === '' ? null : e.target.value as SortOrder;
+                  setSort(channel, value);
+                }}
+                style={{
+                  width: '100%',
+                  marginTop: '6px',
+                  padding: '4px 8px',
+                  fontSize: '11px',
+                  fontWeight: 500,
+                  color: 'var(--color-text-secondary)',
+                  backgroundColor: 'var(--color-bg-elevated)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  outline: 'none',
+                  appearance: 'none',
+                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: 'right 8px center',
+                  paddingRight: '28px',
+                }}
+              >
+                {SORT_OPTIONS.map((option) => (
+                  <option key={option.label} value={option.value ?? ''}>
+                    Sort: {option.label}
                   </option>
                 ))}
               </select>

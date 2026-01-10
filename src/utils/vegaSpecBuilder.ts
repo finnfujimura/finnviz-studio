@@ -105,7 +105,7 @@ function inferMark(encodings: EncodingState): string {
 }
 
 function buildChannelEncoding(config: EncodingFieldConfig) {
-  const { field, aggregate, timeUnit } = config;
+  const { field, aggregate, timeUnit, sort } = config;
   const encoding: Record<string, unknown> = {
     field: field.name,
     type: field.type,
@@ -119,6 +119,11 @@ function buildChannelEncoding(config: EncodingFieldConfig) {
   // Add timeUnit for temporal fields
   if (field.type === 'temporal' && timeUnit) {
     encoding.timeUnit = timeUnit;
+  }
+
+  // Add sort if specified
+  if (sort) {
+    encoding.sort = sort;
   }
 
   return encoding;
