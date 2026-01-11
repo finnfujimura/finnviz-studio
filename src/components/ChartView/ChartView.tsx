@@ -12,7 +12,7 @@ export function ChartView() {
 
   const autoTitle = generateChartTitle(state.encodings);
   const displayTitle = state.chartTitle ?? autoTitle;
-  const spec = buildVegaSpec(state.encodings, state.data, state.markType, state.chartTitle);
+  const spec = buildVegaSpec(state.encodings, state.data, state.markType, state.chartTitle, state.filters);
 
   useEffect(() => {
     // Cleanup previous Vega view
@@ -42,11 +42,11 @@ export function ChartView() {
               domainColor: 'rgba(255, 255, 255, 0.15)',
               tickColor: 'rgba(255, 255, 255, 0.15)',
               labelFont: 'DM Sans, sans-serif',
-              titleFont: 'Instrument Serif, serif',
+              titleFont: 'DM Sans, sans-serif',
               labelFontSize: 11,
               titleFontSize: 13,
-              titleFontWeight: 400,
-              titleFontStyle: 'italic',
+              titleFontWeight: 600,
+              titleFontStyle: 'normal',
             },
             legend: {
               labelColor: '#a3a3a3',
@@ -59,10 +59,10 @@ export function ChartView() {
             },
             title: {
               color: '#fafafa',
-              font: 'Instrument Serif, serif',
+              font: 'DM Sans, sans-serif',
               fontSize: 18,
-              fontWeight: 400,
-              fontStyle: 'italic',
+              fontWeight: 600,
+              fontStyle: 'normal',
             },
             view: {
               stroke: 'transparent',
@@ -130,12 +130,11 @@ export function ChartView() {
         <div>
           <h2
             style={{
-              fontFamily: 'var(--font-display)',
+              fontFamily: 'var(--font-body)',
               fontSize: '18px',
-              fontWeight: 400,
+              fontWeight: 600,
               color: 'var(--color-text-primary)',
               marginBottom: '4px',
-              fontStyle: 'italic',
             }}
           >
             Visualization
@@ -251,12 +250,11 @@ export function ChartView() {
 
             <h3
               style={{
-                fontFamily: 'var(--font-display)',
+                fontFamily: 'var(--font-body)',
                 fontSize: '20px',
-                fontWeight: 400,
+                fontWeight: 600,
                 color: 'var(--color-text-primary)',
                 marginBottom: '8px',
-                fontStyle: 'italic',
               }}
             >
               Create Your Chart
@@ -342,12 +340,11 @@ export function ChartView() {
 
             <h3
               style={{
-                fontFamily: 'var(--font-display)',
+                fontFamily: 'var(--font-body)',
                 fontSize: '20px',
-                fontWeight: 400,
+                fontWeight: 600,
                 color: 'var(--color-text-primary)',
                 marginBottom: '8px',
-                fontStyle: 'italic',
               }}
             >
               Almost There
@@ -415,10 +412,10 @@ export function ChartView() {
                 placeholder={autoTitle || 'Enter chart title...'}
                 style={{
                   flex: 1,
-                  fontFamily: 'var(--font-display)',
+                  fontFamily: 'var(--font-body)',
                   fontSize: '16px',
-                  fontWeight: 400,
-                  fontStyle: 'italic',
+                  fontWeight: 600,
+                  fontStyle: 'normal',
                   color: 'var(--color-text-primary)',
                   backgroundColor: 'var(--color-bg-tertiary)',
                   border: '1px solid var(--color-accent)',
@@ -435,10 +432,10 @@ export function ChartView() {
                 }}
                 style={{
                   flex: 1,
-                  fontFamily: 'var(--font-display)',
+                  fontFamily: 'var(--font-body)',
                   fontSize: '16px',
-                  fontWeight: 400,
-                  fontStyle: 'italic',
+                  fontWeight: 600,
+                  fontStyle: 'normal',
                   color: displayTitle ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
                   padding: '8px 12px',
                   borderRadius: '8px',

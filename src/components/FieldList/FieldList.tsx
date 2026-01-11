@@ -48,12 +48,11 @@ export function FieldList() {
       <div style={{ marginBottom: '20px' }}>
         <h2
           style={{
-            fontFamily: 'var(--font-display)',
+            fontFamily: 'var(--font-body)',
             fontSize: '15px',
-            fontWeight: 400,
+            fontWeight: 600,
             color: 'var(--color-text-primary)',
             marginBottom: '4px',
-            fontStyle: 'italic',
           }}
         >
           Data Fields

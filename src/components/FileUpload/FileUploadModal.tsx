@@ -124,11 +124,10 @@ export function FileUploadModal({ isOpen, onClose }: FileUploadModalProps) {
           <div>
             <h2
               style={{
-                fontFamily: 'var(--font-display)',
+                fontFamily: 'var(--font-body)',
                 fontSize: '20px',
-                fontWeight: 400,
+                fontWeight: 600,
                 color: 'var(--color-text-primary)',
-                fontStyle: 'italic',
                 marginBottom: '4px',
               }}
             >

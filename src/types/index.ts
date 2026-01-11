@@ -8,6 +8,33 @@ export type MarkType = 'auto' | 'bar' | 'line' | 'point' | 'area' | 'rect' | 'ci
 
 export type SortOrder = 'ascending' | 'descending' | '-x' | '-y' | 'x' | 'y' | null;
 
+// Filter types
+export type FilterType = 'range' | 'selection' | 'date-range';
+
+export interface RangeFilterValue {
+  min: number | null;
+  max: number | null;
+}
+
+export interface SelectionFilterValue {
+  selected: string[];
+  available: string[];
+}
+
+export interface DateRangeFilterValue {
+  min: string | null;
+  max: string | null;
+}
+
+export type FilterValue = RangeFilterValue | SelectionFilterValue | DateRangeFilterValue;
+
+export interface FilterConfig {
+  fieldName: string;
+  fieldType: FieldType;
+  filterType: FilterType;
+  value: FilterValue;
+}
+
 export interface DetectedField {
   name: string;
   type: FieldType;
@@ -31,6 +58,7 @@ export interface AppState {
   data: Record<string, unknown>[];
   fields: DetectedField[];
   encodings: EncodingState;
+  filters: FilterConfig[];
   markType: MarkType;
   chartTitle: string | null; // null means auto-generate
   isLoading: boolean;
@@ -51,7 +79,11 @@ export type AppAction =
   | { type: 'RESET_FOR_NEW_DATA' }
   | { type: 'SET_MARK_TYPE'; markType: MarkType }
   | { type: 'SET_CHART_TITLE'; title: string | null }
-  | { type: 'SET_SORT'; channel: EncodingChannel; sort: SortOrder };
+  | { type: 'SET_SORT'; channel: EncodingChannel; sort: SortOrder }
+  | { type: 'ADD_FILTER'; filter: FilterConfig }
+  | { type: 'UPDATE_FILTER'; fieldName: string; value: FilterValue }
+  | { type: 'REMOVE_FILTER'; fieldName: string }
+  | { type: 'CLEAR_FILTERS' };
 
 // File upload types
 export interface FileUploadResult {

@@ -15,7 +15,8 @@
       "mcp__plugin_playwright_playwright__browser_close",
       "mcp__plugin_playwright_playwright__browser_select_option",
       "Bash(npx tsc:*)",
-      "mcp__plugin_playwright_playwright__browser_install"
+      "mcp__plugin_playwright_playwright__browser_install",
+      "mcp__plugin_playwright_playwright__browser_hover"
     ]
   }
 }

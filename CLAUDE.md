@@ -18,8 +18,12 @@ This is a drag-and-drop data visualization tool (similar to Tableau) built with 
 
 ### Data Flow
 
-1. **Data loading**: `AppContext.tsx` loads `superstore.json` on mount and runs field detection
+1. **Data loading**: `AppContext.tsx` loads `superstore.json` on mount (or user uploads CSV/XLSX/XLS) and runs field detection
 2. **Field detection**: `fieldDetection.ts` analyzes data to infer field types (quantitative, nominal, ordinal, temporal)
+   - Quantitative: Numeric fields with >20 unique values
+   - Ordinal: Numeric fields with ≤20 unique values
+   - Temporal: Date fields (detected via patterns or `Date.parse`)
+   - Nominal: String fields
 3. **Drag-and-drop**: `FieldPill` components are draggable; `EncodingShelf` components are drop targets
 4. **Spec building**: When encodings change, `vegaSpecBuilder.ts` generates a Vega-Lite spec
 5. **Rendering**: `ChartView` uses `vega-embed` to render the spec
@@ -29,22 +33,45 @@ This is a drag-and-drop data visualization tool (similar to Tableau) built with 
 All app state lives in `AppContext.tsx` using `useReducer`. Key state:
 - `data`: Raw JSON records
 - `fields`: Detected field metadata (name, type, uniqueCount)
-- `encodings`: Map of channel → field (e.g., `{ x: field, y: field, color: field }`)
+- `encodings`: Map of channel → `EncodingFieldConfig` (includes field, aggregate, timeUnit, sort)
+- `filters`: Array of `FilterConfig` objects
+- `markType`: Current mark type ('auto' or explicit type)
+- `chartTitle`: Custom title or null for auto-generation
 
-Actions: `ASSIGN_FIELD`, `REMOVE_FIELD`, `CLEAR_ALL`, `TOGGLE_FIELD_TYPE`
+Key actions:
+- `ASSIGN_FIELD`, `REMOVE_FIELD`: Add/remove field from encoding channel
+- `SET_AGGREGATE`, `SET_TIME_UNIT`, `SET_SORT`: Modify encoding properties
+- `ADD_FILTER`, `UPDATE_FILTER`, `REMOVE_FILTER`: Manage data filters
+- `SET_MARK_TYPE`, `SET_CHART_TITLE`: Override defaults
+- `TOGGLE_FIELD_TYPE`: Switch between ordinal/nominal
+- `RESET_FOR_NEW_DATA`: Clear state when loading new dataset
 
 ### Key Types (`src/types/index.ts`)
 
 - `FieldType`: `'quantitative' | 'nominal' | 'ordinal' | 'temporal'`
+- `AggregateType`: `'sum' | 'mean' | 'median' | 'min' | 'max' | 'count' | 'distinct' | null`
+- `TimeUnit`: `'year' | 'quarter' | 'month' | 'week' | 'day' | 'yearmonth' | 'yearmonthdate' | null`
+- `MarkType`: `'auto' | 'bar' | 'line' | 'point' | 'area' | 'rect' | 'circle' | 'tick'`
+- `SortOrder`: `'ascending' | 'descending' | '-x' | '-y' | 'x' | 'y' | null`
 - `EncodingChannel`: `'x' | 'y' | 'color' | 'size' | 'shape' | 'row' | 'column'`
 - `DetectedField`: `{ name, type, uniqueCount }`
-- `EncodingState`: Partial record mapping channels to fields
+- `EncodingFieldConfig`: `{ field, aggregate, timeUnit, sort }`
+- `FilterConfig`: `{ fieldName, fieldType, filterType, value }`
+  - Range filters (quantitative): `{ min, max }`
+  - Selection filters (nominal/ordinal): `{ selected[], available[] }`
+  - Date range filters (temporal): `{ min, max }` (dates as strings)
 
 ### Vega-Lite Spec Building (`vegaSpecBuilder.ts`)
 
-- `inferMark()`: Auto-selects mark type (point/bar/line/rect) based on field types on x/y
-- `buildChannelEncoding()`: Creates encoding object with field name and type
-- `buildVegaSpec()`: Assembles complete Vega-Lite TopLevelSpec
+- `inferMark()`: Auto-selects mark type based on field types:
+  - Quant × Quant → `point`
+  - Nominal/Ordinal × Quant → `bar`
+  - Temporal × Quant → `line`
+  - Nominal × Nominal → `rect`
+- `buildChannelEncoding()`: Creates encoding with field, type, aggregate, timeUnit, sort
+- `buildFilterTransforms()`: Converts `FilterConfig[]` to Vega-Lite filter expressions
+- `generateChartTitle()`: Auto-generates titles like "Average Sales by Region"
+- `buildVegaSpec()`: Assembles complete Vega-Lite TopLevelSpec with data, transforms, encodings
 
 ### Component Structure
 
@@ -55,9 +82,20 @@ App.tsx
     ├── FieldList (left sidebar)
     │   └── FieldPill (draggable field chips)
     ├── EncodingPanel (middle sidebar)
-    │   └── EncodingShelf (drop zones for x/y/color/size/shape/row/column)
-    └── ChartView (main area, renders Vega chart)
+    │   ├── EncodingShelf (drop zones for x/y/color/size/shape/row/column)
+    │   │   └── Controls for aggregate, timeUnit, sort (per encoding)
+    │   └── Mark type selector
+    ├── FilterPanel (optional sidebar)
+    │   └── FilterRow (range/selection filters per field)
+    └── ChartView (main area, renders Vega chart via vega-embed)
 ```
+
+### File Upload
+
+The app supports uploading custom datasets:
+- CSV files (parsed via PapaParse)
+- Excel files (.xlsx, .xls) via the xlsx library
+- Parsed data is passed to `loadData()` which resets state and re-runs field detection
 
 ### Styling
 

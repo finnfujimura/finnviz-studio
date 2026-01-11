@@ -1,5 +1,5 @@
 import { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
-import type { AppState, AppAction, DetectedField, EncodingChannel, FieldType, AggregateType, TimeUnit, MarkType, SortOrder } from '../types';
+import type { AppState, AppAction, DetectedField, EncodingChannel, FieldType, AggregateType, TimeUnit, MarkType, SortOrder, FilterConfig, FilterValue, FilterType, RangeFilterValue, SelectionFilterValue, DateRangeFilterValue } from '../types';
 import { detectAllFields } from '../utils/fieldDetection';
 import carsData from '../../superstore.json';
 
@@ -7,6 +7,7 @@ const initialState: AppState = {
   data: [],
   fields: [],
   encodings: {},
+  filters: [],
   markType: 'auto',
   chartTitle: null,
   isLoading: true,
@@ -60,7 +61,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
       };
     }
     case 'CLEAR_ALL':
-      return { ...state, encodings: {}, chartTitle: null };
+      return { ...state, encodings: {}, filters: [], chartTitle: null };
     case 'SET_LOADING':
       return { ...state, isLoading: action.payload };
     case 'SET_ERROR':
@@ -93,6 +94,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         data: [],
         fields: [],
         encodings: {},
+        filters: [],
         markType: 'auto',
         chartTitle: null,
         isLoading: true,
@@ -113,6 +115,29 @@ function appReducer(state: AppState, action: AppAction): AppState {
         },
       };
     }
+    case 'ADD_FILTER': {
+      // Prevent duplicate filters for same field
+      if (state.filters.some(f => f.fieldName === action.filter.fieldName)) {
+        return state;
+      }
+      return { ...state, filters: [...state.filters, action.filter] };
+    }
+    case 'UPDATE_FILTER': {
+      return {
+        ...state,
+        filters: state.filters.map(f =>
+          f.fieldName === action.fieldName ? { ...f, value: action.value } : f
+        ),
+      };
+    }
+    case 'REMOVE_FILTER': {
+      return {
+        ...state,
+        filters: state.filters.filter(f => f.fieldName !== action.fieldName),
+      };
+    }
+    case 'CLEAR_FILTERS':
+      return { ...state, filters: [] };
     default:
       return state;
   }
@@ -130,6 +155,10 @@ interface AppContextType {
   clearAll: () => void;
   toggleFieldType: (fieldName: string) => void;
   loadData: (data: Record<string, unknown>[]) => void;
+  addFilter: (field: DetectedField) => void;
+  updateFilter: (fieldName: string, value: FilterValue) => void;
+  removeFilter: (fieldName: string) => void;
+  clearFilters: () => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -197,8 +226,75 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Helper to get unique values for a field
+  const getUniqueValues = (fieldName: string): string[] => {
+    const values = new Set<string>();
+    state.data.forEach(row => {
+      const val = row[fieldName];
+      if (val !== null && val !== undefined) {
+        values.add(String(val));
+      }
+    });
+    return Array.from(values).sort();
+  };
+
+  // Helper to get min/max for a numeric field
+  const getFieldRange = (fieldName: string): { min: number; max: number } => {
+    let min = Infinity;
+    let max = -Infinity;
+    state.data.forEach(row => {
+      const val = row[fieldName];
+      if (typeof val === 'number' && !isNaN(val)) {
+        min = Math.min(min, val);
+        max = Math.max(max, val);
+      }
+    });
+    return { min: min === Infinity ? 0 : min, max: max === -Infinity ? 0 : max };
+  };
+
+  const addFilter = (field: DetectedField) => {
+    // Create filter with smart defaults based on field type
+    let filterType: FilterType;
+    let value: FilterValue;
+
+    if (field.type === 'quantitative') {
+      filterType = 'range';
+      const range = getFieldRange(field.name);
+      value = { min: range.min, max: range.max } as RangeFilterValue;
+    } else if (field.type === 'temporal') {
+      filterType = 'date-range';
+      value = { min: null, max: null } as DateRangeFilterValue;
+    } else {
+      // nominal or ordinal
+      filterType = 'selection';
+      const available = getUniqueValues(field.name);
+      value = { selected: [...available], available } as SelectionFilterValue;
+    }
+
+    const filter: FilterConfig = {
+      fieldName: field.name,
+      fieldType: field.type,
+      filterType,
+      value,
+    };
+
+    dispatch({ type: 'ADD_FILTER', filter });
+  };
+
+  const updateFilter = (fieldName: string, value: FilterValue) => {
+    dispatch({ type: 'UPDATE_FILTER', fieldName, value });
+  };
+
+  const removeFilter = (fieldName: string) => {
+    dispatch({ type: 'REMOVE_FILTER', fieldName });
+  };
+
+  const clearFilters = () => {
+    dispatch({ type: 'CLEAR_FILTERS' });
+  };
+
   return (
-    <AppContext.Provider value={{ state, assignField, removeField, setAggregate, setTimeUnit, setSort, setMarkType, setChartTitle, clearAll, toggleFieldType, loadData }}>
+    <AppContext.Provider value={{ state, assignField, removeField, setAggregate, setTimeUnit, setSort, setMarkType, setChartTitle, clearAll, toggleFieldType, loadData, addFilter, updateFilter, removeFilter, clearFilters }}>
       {children}
     </AppContext.Provider>
   );

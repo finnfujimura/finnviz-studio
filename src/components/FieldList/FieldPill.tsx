@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type { DetectedField, FieldType } from '../../types';
 import { useApp } from '../../context/AppContext';
 
@@ -22,9 +22,23 @@ interface FieldPillProps {
 }
 
 export function FieldPill({ field, index }: FieldPillProps) {
-  const { toggleFieldType } = useApp();
+  const { state, toggleFieldType, addFilter, removeFilter } = useApp();
   const [isHovered, setIsHovered] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+
+  // Check if this field has an active filter
+  const hasFilter = useMemo(() => {
+    return state.filters.some(f => f.fieldName === field.name);
+  }, [state.filters, field.name]);
+
+  const handleFilterToggle = () => {
+    // Toggle filter: add if not present, remove if present
+    if (hasFilter) {
+      removeFilter(field.name);
+    } else {
+      addFilter(field);
+    }
+  };
 
   const handleDragStart = (e: React.DragEvent) => {
     e.dataTransfer.setData('application/json', JSON.stringify(field));
@@ -52,10 +66,12 @@ export function FieldPill({ field, index }: FieldPillProps) {
         alignItems: 'center',
         gap: '10px',
         padding: '10px 14px',
-        backgroundColor: isHovered
-          ? 'var(--color-bg-tertiary)'
-          : 'var(--color-bg-elevated)',
-        border: `1px solid ${isHovered ? 'var(--color-border-hover)' : 'var(--color-border)'}`,
+        backgroundColor: hasFilter
+          ? 'var(--color-accent-glow)'
+          : isHovered
+            ? 'var(--color-bg-tertiary)'
+            : 'var(--color-bg-elevated)',
+        border: `1px solid ${hasFilter ? 'var(--color-accent)' : isHovered ? 'var(--color-border-hover)' : 'var(--color-border)'}`,
         borderRadius: '8px',
         cursor: isDragging ? 'grabbing' : 'grab',
         fontSize: '13px',
@@ -100,8 +116,65 @@ export function FieldPill({ field, index }: FieldPillProps) {
         {field.name}
       </span>
 
+      {/* Filter button - always visible when hovered or active */}
+      {(isHovered || hasFilter) && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            handleFilterToggle();
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+          draggable={false}
+          title={hasFilter ? 'Remove filter' : 'Add filter'}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '20px',
+            height: '20px',
+            padding: 0,
+            backgroundColor: hasFilter
+              ? 'var(--color-accent-glow)'
+              : 'var(--color-bg-tertiary)',
+            border: `1px solid ${hasFilter ? 'var(--color-accent)' : 'var(--color-border)'}`,
+            borderRadius: '4px',
+            cursor: 'pointer',
+            color: hasFilter ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+            flexShrink: 0,
+            transition: 'all 0.15s ease',
+          }}
+          onMouseOver={(e) => {
+            if (!hasFilter) {
+              e.currentTarget.style.backgroundColor = 'var(--color-accent-glow)';
+              e.currentTarget.style.borderColor = 'var(--color-accent)';
+              e.currentTarget.style.color = 'var(--color-accent)';
+            }
+          }}
+          onMouseOut={(e) => {
+            if (!hasFilter) {
+              e.currentTarget.style.backgroundColor = 'var(--color-bg-tertiary)';
+              e.currentTarget.style.borderColor = 'var(--color-border)';
+              e.currentTarget.style.color = 'var(--color-text-secondary)';
+            }
+          }}
+        >
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+          </svg>
+        </button>
+      )}
+
       {/* Toggle button for ordinal/nominal */}
-      {canToggle && isHovered && (
+      {canToggle && isHovered && !hasFilter && (
         <button
           onClick={(e) => {
             e.stopPropagation();

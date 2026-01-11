@@ -1,5 +1,5 @@
 import type { TopLevelSpec } from 'vega-lite';
-import type { EncodingState, EncodingFieldConfig, MarkType, AggregateType } from '../types';
+import type { EncodingState, EncodingFieldConfig, MarkType, AggregateType, FilterConfig, RangeFilterValue, SelectionFilterValue } from '../types';
 
 // Format field name for display (replace underscores with spaces)
 function formatFieldName(name: string): string {
@@ -129,11 +129,55 @@ function buildChannelEncoding(config: EncodingFieldConfig) {
   return encoding;
 }
 
+// Build filter transforms for Vega-Lite
+function buildFilterTransforms(filters: FilterConfig[]): { filter: string }[] {
+  return filters
+    .map((filter) => {
+      switch (filter.filterType) {
+        case 'range': {
+          const val = filter.value as RangeFilterValue;
+          const conditions: string[] = [];
+          if (val.min !== null) {
+            conditions.push(`datum['${filter.fieldName}'] >= ${val.min}`);
+          }
+          if (val.max !== null) {
+            conditions.push(`datum['${filter.fieldName}'] <= ${val.max}`);
+          }
+          if (conditions.length === 0) return null;
+          return { filter: conditions.join(' && ') };
+        }
+        case 'selection': {
+          const val = filter.value as SelectionFilterValue;
+          if (val.selected.length === 0) {
+            // No items selected = show nothing
+            return { filter: 'false' };
+          }
+          if (val.selected.length === val.available.length) {
+            // All items selected = no filter needed
+            return null;
+          }
+          // Escape single quotes in values
+          const escapedValues = val.selected.map((v) => v.replace(/'/g, "\\'"));
+          const valuesList = escapedValues.map((v) => `'${v}'`).join(', ');
+          return { filter: `indexof([${valuesList}], datum['${filter.fieldName}']) !== -1` };
+        }
+        case 'date-range': {
+          // Date range filtering - not fully implemented yet
+          return null;
+        }
+        default:
+          return null;
+      }
+    })
+    .filter((t): t is { filter: string } => t !== null);
+}
+
 export function buildVegaSpec(
   encodings: EncodingState,
   data: Record<string, unknown>[],
   markType: MarkType = 'auto',
-  title?: string | null
+  title?: string | null,
+  filters?: FilterConfig[]
 ): TopLevelSpec | null {
   if (!encodings.x && !encodings.y) {
     return null;
@@ -168,9 +212,13 @@ export function buildVegaSpec(
     encoding.column = buildChannelEncoding(encodings.column);
   }
 
+  // Build filter transforms if filters are provided
+  const transforms = filters ? buildFilterTransforms(filters) : [];
+
   const spec: TopLevelSpec = {
     $schema: 'https://vega.github.io/schema/vega-lite/v6.json',
     data: { values: data },
+    ...(transforms.length > 0 && { transform: transforms }),
     mark: { type: mark as 'point' | 'bar' | 'line' | 'rect' | 'area' | 'circle' | 'tick', tooltip: true },
     encoding,
     width: 'container',

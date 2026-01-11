@@ -34,10 +34,10 @@ function AppContent() {
         />
         <span
           style={{
-            fontFamily: 'var(--font-display)',
+            fontFamily: 'var(--font-body)',
             fontSize: '18px',
             color: 'var(--color-text-secondary)',
-            fontStyle: 'italic',
+            fontWeight: 500,
           }}
         >
           Loading your data...
@@ -80,9 +80,10 @@ function AppContent() {
         </div>
         <span
           style={{
-            fontFamily: 'var(--font-display)',
+            fontFamily: 'var(--font-body)',
             fontSize: '20px',
             color: '#ef4444',
+            fontWeight: 600,
           }}
         >
           {state.error}
