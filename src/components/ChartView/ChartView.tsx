@@ -4,32 +4,88 @@ import { useApp } from '../../context/AppContext';
 import { buildVegaSpec, generateChartTitle } from '../../utils/vegaSpecBuilder';
 import { DataTableView } from '../DataTableView/DataTableView';
 
-export function ChartView() {
-  const { state, setChartTitle, setViewMode } = useApp();
+function getViewToggleStyle(isActive: boolean): React.CSSProperties {
+  return {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '6px 16px',
+    borderRadius: '8px',
+    fontSize: '12px',
+    fontWeight: 600,
+    cursor: 'pointer',
+    border: 'none',
+    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+    backgroundColor: isActive ? 'var(--color-bg-secondary)' : 'transparent',
+    color: isActive ? 'var(--color-accent)' : 'var(--color-text-muted)',
+    boxShadow: isActive ? '0 4px 12px rgba(59, 130, 246, 0.15)' : 'none',
+  };
+}
+
+interface ChartViewProps {
+  chartId?: string;
+  isMinimized?: boolean;
+}
+
+export function ChartView({ chartId, isMinimized = false }: ChartViewProps) {
+  const { 
+    state, 
+    setChartTitle: setChartTitleAction,
+    setViewMode
+  } = useApp();
+  
   const containerRef = useRef<HTMLDivElement>(null);
   const vegaResultRef = useRef<Result | null>(null);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [titleInput, setTitleInput] = useState('');
+  
+  // Determine which chart we are viewing
+  const targetId = chartId || state.activeChartId || 'default';
+  const chartConfig = state.charts.find(c => c.id === targetId) || state.charts[0];
+  const { encodings, markType, chartTitle, colorScheme } = chartConfig;
+
+  const [titleInput, setTitleInput] = useState(chartTitle || '');
   const [transformedData, setTransformedData] = useState<Record<string, unknown>[] | undefined>(undefined);
 
-  const autoTitle = generateChartTitle(state.encodings);
-  const displayTitle = state.chartTitle ?? autoTitle;
+  const autoTitle = generateChartTitle(encodings);
+  const displayTitle = chartTitle ?? autoTitle;
+
+  function saveTitle(): void {
+    setIsEditingTitle(false);
+    const trimmed = titleInput.trim();
+    setChartTitleAction(trimmed || null, targetId);
+  }
 
   const spec = useMemo(() => {
-    return buildVegaSpec(state.encodings, state.data, state.markType, state.chartTitle, state.filters);
-  }, [state.encodings, state.data, state.markType, state.chartTitle, state.filters]);
+    return buildVegaSpec(encodings, state.data, markType, chartTitle, state.filters, colorScheme);
+  }, [encodings, state.data, markType, chartTitle, state.filters, colorScheme]);
 
   // Calculate X-axis density for dynamic label scaling
   const densityMetrics = useMemo(() => {
-    const xField = state.encodings.x?.field.name;
+    const xField = encodings.x?.field.name;
     const uniqueXValues = xField ? new Set(state.data.map((d) => d[xField])).size : 0;
 
     // Scaling logic: smaller font and rotated angle as density increases
-    return {
-      labelSize: uniqueXValues > 50 ? 8 : uniqueXValues > 25 ? 9 : 11,
-      angle: uniqueXValues > 20 ? -90 : uniqueXValues > 8 ? -45 : 0
-    };
-  }, [state.encodings.x?.field.name, state.data]);
+    let labelSize: number;
+    let angle: number;
+
+    if (uniqueXValues > 50) {
+      labelSize = 8;
+    } else if (uniqueXValues > 25) {
+      labelSize = 9;
+    } else {
+      labelSize = 11;
+    }
+
+    if (uniqueXValues > 20) {
+      angle = -90;
+    } else if (uniqueXValues > 8) {
+      angle = -45;
+    } else {
+      angle = 0;
+    }
+
+    return { labelSize, angle };
+  }, [encodings.x?.field.name, state.data]);
 
   useEffect(() => {
     // Cleanup previous Vega view
@@ -89,9 +145,9 @@ export function ChartView() {
             view: {
               stroke: 'transparent',
             },
-            range: {
+            range: colorScheme === 'default' ? {
               category: ['#3b82f6', '#f97316', '#a855f7', '#22c55e', '#ef4444', '#eab308', '#06b6d4', '#ec4899'],
-            },
+            } : {},
           },
         });
         vegaResultRef.current = result;
@@ -122,12 +178,12 @@ export function ChartView() {
     };
   }, [spec, densityMetrics, state.viewMode]);
 
-  const hasEncodings = Object.keys(state.encodings).length > 0;
+  const hasEncodings = Object.keys(encodings).length > 0;
 
   return (
     <main
       style={{
-        padding: '32px',
+        padding: isMinimized ? '16px' : '32px',
         backgroundColor: 'var(--color-bg-primary)',
         height: '100%',
         overflow: 'auto',
@@ -150,138 +206,85 @@ export function ChartView() {
       />
 
       {/* Header */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: '24px',
-          position: 'relative',
-          zIndex: 1,
-        }}
-      >
-        <div>
-          <h2
-            style={{
-              fontFamily: 'var(--font-body)',
-              fontSize: '18px',
-              fontWeight: 600,
-              color: 'var(--color-text-primary)',
-              marginBottom: '4px',
-            }}
-          >
-            Visualization
-          </h2>
-          <p
-            style={{
-              fontSize: '12px',
-              color: 'var(--color-text-muted)',
-            }}
-          >
-            {hasEncodings
-              ? spec
-                ? 'Your chart is ready'
-                : 'Add X or Y axis to render'
-              : 'Start by dragging fields to encodings'}
-          </p>
-        </div>
-
-        {spec && (
+      {!isMinimized && (
+        <>
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
-              padding: '6px 12px',
-              backgroundColor: 'var(--color-bg-tertiary)',
-              borderRadius: '6px',
-              fontSize: '11px',
-              color: 'var(--color-text-secondary)',
+              justifyContent: 'space-between',
+              marginBottom: '24px',
+              position: 'relative',
+              zIndex: 1,
             }}
           >
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-            </svg>
-            Live Preview
-          </div>
-        )}
+            <div>
+              <h2
+                style={{
+                  fontFamily: 'var(--font-body)',
+                  fontSize: '18px',
+                  fontWeight: 600,
+                  color: 'var(--color-text-primary)',
+                  marginBottom: '4px',
+                }}
+              >
+                Visualization
+              </h2>
+              <p
+                style={{
+                  fontSize: '12px',
+                  color: 'var(--color-text-muted)',
+                }}
+              >
+                {hasEncodings
+                  ? spec
+                    ? 'Your chart is ready'
+                    : 'Add X or Y axis to render'
+                  : 'Start by dragging fields to encodings'}
+              </p>
+            </div>
 
-        {/* View Mode Switcher */}
-        <div
-          style={{
-            display: 'flex',
-            backgroundColor: 'var(--color-bg-tertiary)',
-            padding: '4px',
-            borderRadius: '10px',
-            border: '1px solid var(--color-border)',
-            gap: '4px',
-            boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)',
-          }}
-        >
-          <button
-            onClick={() => setViewMode('chart')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '6px 16px',
-              borderRadius: '8px',
-              fontSize: '12px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              border: 'none',
-              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-              backgroundColor: state.viewMode === 'chart' ? 'var(--color-bg-secondary)' : 'transparent',
-              color: state.viewMode === 'chart' ? 'var(--color-accent)' : 'var(--color-text-muted)',
-              boxShadow: state.viewMode === 'chart' ? '0 4px 12px rgba(59, 130, 246, 0.15)' : 'none',
-              transform: state.viewMode === 'chart' ? 'translateY(0)' : 'translateY(0)',
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="20" x2="18" y2="10" />
-              <line x1="12" y1="20" x2="12" y2="4" />
-              <line x1="6" y1="20" x2="6" y2="14" />
-            </svg>
-            Chart
-          </button>
-          <button
-            onClick={() => setViewMode('table')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '6px 16px',
-              borderRadius: '8px',
-              fontSize: '12px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              border: 'none',
-              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-              backgroundColor: state.viewMode === 'table' ? 'var(--color-bg-secondary)' : 'transparent',
-              color: state.viewMode === 'table' ? 'var(--color-accent)' : 'var(--color-text-muted)',
-              boxShadow: state.viewMode === 'table' ? '0 4px 12px rgba(59, 130, 246, 0.15)' : 'none',
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 3h18v18H3zM3 9h18M3 15h18M9 3v18M15 3v18" />
-            </svg>
-            Table
-          </button>
-        </div>
-      </div>
+            {/* View Mode Switcher */}
+            <div
+              style={{
+                display: 'flex',
+                backgroundColor: 'var(--color-bg-tertiary)',
+                padding: '4px',
+                borderRadius: '10px',
+                border: '1px solid var(--color-border)',
+                gap: '4px',
+                boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)',
+              }}
+            >
+              <button
+                onClick={() => setViewMode('chart')}
+                style={getViewToggleStyle(state.viewMode === 'chart')}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="20" x2="18" y2="10" />
+                  <line x1="12" y1="20" x2="12" y2="4" />
+                  <line x1="6" y1="20" x2="6" y2="14" />
+                </svg>
+                Chart
+              </button>
+              <button
+                onClick={() => setViewMode('table')}
+                style={getViewToggleStyle(state.viewMode === 'table')}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 3h18v18H3zM3 9h18M3 15h18M9 3v18M15 3v18" />
+                </svg>
+                Table
+              </button>
+            </div>
+          </div>
+          <div style={{ height: '1px', backgroundColor: 'var(--color-border)', marginBottom: '24px', opacity: 0.5 }} />
+        </>
+      )}
 
       <div style={{ 
         flex: 1, 
-        display: state.viewMode === 'chart' ? 'flex' : 'none', 
+        display: (isMinimized || state.viewMode === 'chart') ? 'flex' : 'none', 
         flexDirection: 'column',
         minHeight: 0,
       }}>
@@ -488,22 +491,10 @@ export function ChartView() {
                   type="text"
                   value={titleInput}
                   onChange={(e) => setTitleInput(e.target.value)}
-                  onBlur={() => {
-                    setIsEditingTitle(false);
-                    if (titleInput.trim()) {
-                      setChartTitle(titleInput.trim());
-                    } else {
-                      setChartTitle(null);
-                    }
-                  }}
+                  onBlur={saveTitle}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
-                      setIsEditingTitle(false);
-                      if (titleInput.trim()) {
-                        setChartTitle(titleInput.trim());
-                      } else {
-                        setChartTitle(null);
-                      }
+                      saveTitle();
                     } else if (e.key === 'Escape') {
                       setIsEditingTitle(false);
                       setTitleInput(displayTitle);
@@ -570,9 +561,9 @@ export function ChartView() {
                   </svg>
                 </div>
               )}
-              {state.chartTitle && (
+              {chartTitle && (
                 <button
-                  onClick={() => setChartTitle(null)}
+                  onClick={() => setChartTitleAction(null, targetId)}
                   title="Reset to auto-generated title"
                   style={{
                     display: 'flex',

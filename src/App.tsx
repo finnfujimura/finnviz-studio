@@ -117,6 +117,7 @@ function AppContent() {
           padding: '0 32px',
           borderBottom: '1px solid var(--color-border)',
           background: 'var(--color-bg-secondary)',
+          zIndex: 100,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -177,16 +178,7 @@ function AppContent() {
               e.currentTarget.style.color = 'var(--color-text-secondary)';
             }}
           >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
               <polyline points="17 8 12 3 7 8" />
               <line x1="12" y1="3" x2="12" y2="15" />
@@ -227,6 +219,8 @@ function AppContent() {
         isCollapsed={isEncodingPanelCollapsed}
         onToggle={() => setIsEncodingPanelCollapsed(!isEncodingPanelCollapsed)}
       />
+
+      {/* Chart View */}
       <ChartView />
 
       {/* Noise overlay for texture */}

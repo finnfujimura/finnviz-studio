@@ -10,6 +10,17 @@ export type SortOrder = 'ascending' | 'descending' | '-x' | '-y' | 'x' | 'y' | n
 
 export type ViewMode = 'chart' | 'table';
 
+export type ColorScheme = 'default' | 'classic' | 'vibrant' | 'pastel' | 'professional' | 'ocean' | 'forest' | 'sunset' | 'purple-haze' | 'viridis' | 'magma' | 'inferno' | 'plasma' | 'neon' | 'midnight';
+
+// Chart configuration for multi-chart dashboards
+export interface ChartConfig {
+  id: string;
+  encodings: EncodingState;
+  markType: MarkType;
+  chartTitle: string | null;
+  colorScheme: ColorScheme;
+}
+
 // Filter types
 export type FilterType = 'range' | 'selection' | 'date-range';
 
@@ -59,10 +70,9 @@ export type EncodingState = {
 export interface AppState {
   data: Record<string, unknown>[];
   fields: DetectedField[];
-  encodings: EncodingState;
+  charts: ChartConfig[];
+  activeChartId: string | null;
   filters: FilterConfig[];
-  markType: MarkType;
-  chartTitle: string | null; // null means auto-generate
   isLoading: boolean;
   error: string | null;
   projects: ProjectMetadata[];
@@ -77,27 +87,27 @@ export interface ProjectMetadata {
 }
 
 export interface SavedProject extends ProjectMetadata {
-  encodings: EncodingState;
+  charts: ChartConfig[];
+  activeChartId: string | null;
   filters: FilterConfig[];
-  markType: MarkType;
-  chartTitle: string | null;
 }
 
 export type AppAction =
   | { type: 'SET_DATA'; payload: Record<string, unknown>[] }
   | { type: 'SET_FIELDS'; payload: DetectedField[] }
-  | { type: 'ASSIGN_FIELD'; channel: EncodingChannel; field: DetectedField }
-  | { type: 'REMOVE_FIELD'; channel: EncodingChannel }
-  | { type: 'SET_AGGREGATE'; channel: EncodingChannel; aggregate: AggregateType }
-  | { type: 'SET_TIME_UNIT'; channel: EncodingChannel; timeUnit: TimeUnit }
+  | { type: 'ASSIGN_FIELD'; channel: EncodingChannel; field: DetectedField; chartId?: string }
+  | { type: 'REMOVE_FIELD'; channel: EncodingChannel; chartId?: string }
+  | { type: 'SET_AGGREGATE'; channel: EncodingChannel; aggregate: AggregateType; chartId?: string }
+  | { type: 'SET_TIME_UNIT'; channel: EncodingChannel; timeUnit: TimeUnit; chartId?: string }
   | { type: 'CLEAR_ALL' }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string }
   | { type: 'TOGGLE_FIELD_TYPE'; fieldName: string }
   | { type: 'RESET_FOR_NEW_DATA' }
-  | { type: 'SET_MARK_TYPE'; markType: MarkType }
-  | { type: 'SET_CHART_TITLE'; title: string | null }
-  | { type: 'SET_SORT'; channel: EncodingChannel; sort: SortOrder }
+  | { type: 'SET_MARK_TYPE'; markType: MarkType; chartId?: string }
+  | { type: 'SET_CHART_TITLE'; title: string | null; chartId?: string }
+  | { type: 'SET_COLOR_SCHEME'; colorScheme: ColorScheme; chartId?: string }
+  | { type: 'SET_SORT'; channel: EncodingChannel; sort: SortOrder; chartId?: string }
   | { type: 'ADD_FILTER'; filter: FilterConfig }
   | { type: 'UPDATE_FILTER'; fieldName: string; value: FilterValue }
   | { type: 'REMOVE_FILTER'; fieldName: string }
@@ -106,7 +116,11 @@ export type AppAction =
   | { type: 'LOAD_PROJECT'; project: SavedProject }
   | { type: 'DELETE_PROJECT'; id: string }
   | { type: 'SET_PROJECTS'; projects: ProjectMetadata[] }
-  | { type: 'SET_VIEW_MODE'; mode: ViewMode };
+  | { type: 'SET_VIEW_MODE'; mode: ViewMode }
+  | { type: 'ADD_CHART' }
+  | { type: 'REMOVE_CHART'; id: string }
+  | { type: 'SET_ACTIVE_CHART'; id: string }
+  | { type: 'DUPLICATE_CHART'; id: string };
 
 // File upload types
 export interface FileUploadResult {

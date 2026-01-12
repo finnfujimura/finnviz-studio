@@ -65,6 +65,25 @@ const SORT_OPTIONS: { value: SortOrder; label: string }[] = [
   { value: 'y', label: 'By Y (asc)' },
 ];
 
+const SELECT_STYLE: React.CSSProperties = {
+  width: '100%',
+  marginTop: '6px',
+  padding: '4px 8px',
+  fontSize: '11px',
+  fontWeight: 500,
+  color: 'var(--color-text-secondary)',
+  backgroundColor: 'var(--color-bg-elevated)',
+  border: '1px solid var(--color-border)',
+  borderRadius: '4px',
+  cursor: 'pointer',
+  outline: 'none',
+  appearance: 'none',
+  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+  backgroundRepeat: 'no-repeat',
+  backgroundPosition: 'right 8px center',
+  paddingRight: '28px',
+};
+
 interface EncodingShelfProps {
   channel: EncodingChannel;
   label: string;
@@ -76,7 +95,8 @@ export function EncodingShelf({ channel, label }: EncodingShelfProps) {
   const [isHoveredRemove, setIsHoveredRemove] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
-  const encodingConfig = state.encodings[channel];
+  const activeChart = state.charts.find(c => c.id === state.activeChartId) || state.charts[0];
+  const encodingConfig = activeChart.encodings[channel];
   const assignedField = encodingConfig?.field;
   const currentAggregate = encodingConfig?.aggregate ?? null;
   const currentTimeUnit = encodingConfig?.timeUnit ?? null;
@@ -299,24 +319,7 @@ export function EncodingShelf({ channel, label }: EncodingShelfProps) {
                 const value = e.target.value === '' ? null : e.target.value as AggregateType;
                 setAggregate(channel, value);
               }}
-              style={{
-                width: '100%',
-                marginTop: '6px',
-                padding: '4px 8px',
-                fontSize: '11px',
-                fontWeight: 500,
-                color: 'var(--color-text-secondary)',
-                backgroundColor: 'var(--color-bg-elevated)',
-                border: '1px solid var(--color-border)',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                outline: 'none',
-                appearance: 'none',
-                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
-                backgroundRepeat: 'no-repeat',
-                backgroundPosition: 'right 8px center',
-                paddingRight: '28px',
-              }}
+              style={SELECT_STYLE}
             >
               {AGGREGATE_OPTIONS[assignedField.type].map((option) => (
                 <option key={option.label} value={option.value ?? ''}>
@@ -333,24 +336,7 @@ export function EncodingShelf({ channel, label }: EncodingShelfProps) {
                   const value = e.target.value as TimeUnit;
                   setTimeUnit(channel, value);
                 }}
-                style={{
-                  width: '100%',
-                  marginTop: '6px',
-                  padding: '4px 8px',
-                  fontSize: '11px',
-                  fontWeight: 500,
-                  color: 'var(--color-text-secondary)',
-                  backgroundColor: 'var(--color-bg-elevated)',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  outline: 'none',
-                  appearance: 'none',
-                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 8px center',
-                  paddingRight: '28px',
-                }}
+                style={SELECT_STYLE}
               >
                 {TIME_UNIT_OPTIONS.map((option) => (
                   <option key={option.label} value={option.value ?? ''}>
@@ -368,24 +354,7 @@ export function EncodingShelf({ channel, label }: EncodingShelfProps) {
                   const value = e.target.value === '' ? null : e.target.value as SortOrder;
                   setSort(channel, value);
                 }}
-                style={{
-                  width: '100%',
-                  marginTop: '6px',
-                  padding: '4px 8px',
-                  fontSize: '11px',
-                  fontWeight: 500,
-                  color: 'var(--color-text-secondary)',
-                  backgroundColor: 'var(--color-bg-elevated)',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  outline: 'none',
-                  appearance: 'none',
-                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 8px center',
-                  paddingRight: '28px',
-                }}
+                style={SELECT_STYLE}
               >
                 {SORT_OPTIONS.map((option) => (
                   <option key={option.label} value={option.value ?? ''}>

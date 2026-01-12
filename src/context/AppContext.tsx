@@ -1,5 +1,5 @@
 import { createContext, useContext, useReducer, useEffect, ReactNode, useRef } from 'react';
-import type { AppState, AppAction, DetectedField, EncodingChannel, FieldType, AggregateType, TimeUnit, MarkType, SortOrder, FilterConfig, FilterValue, FilterType, RangeFilterValue, SelectionFilterValue, DateRangeFilterValue, SavedProject, ViewMode } from '../types';
+import type { AppState, AppAction, DetectedField, EncodingChannel, FieldType, AggregateType, TimeUnit, MarkType, SortOrder, FilterConfig, FilterValue, FilterType, RangeFilterValue, SelectionFilterValue, DateRangeFilterValue, SavedProject, ViewMode, ChartConfig, ColorScheme } from '../types';
 import { detectAllFields } from '../utils/fieldDetection';
 import { persistence } from '../utils/persistence';
 import carsData from '../../superstore.json';
@@ -7,10 +7,17 @@ import carsData from '../../superstore.json';
 const initialState: AppState = {
   data: [],
   fields: [],
-  encodings: {},
+  charts: [
+    {
+      id: 'default',
+      encodings: {},
+      markType: 'auto',
+      chartTitle: null,
+      colorScheme: 'default',
+    },
+  ],
+  activeChartId: 'default',
   filters: [],
-  markType: 'auto',
-  chartTitle: null,
   isLoading: true,
   error: null,
   projects: [],
@@ -19,53 +26,73 @@ const initialState: AppState = {
 };
 
 function appReducer(state: AppState, action: AppAction): AppState {
+  const updateChart = (chartId: string | undefined, updates: Partial<ChartConfig>): ChartConfig[] => {
+    const targetId = chartId || state.activeChartId;
+    return state.charts.map(chart => 
+      chart.id === targetId ? { ...chart, ...updates } : chart
+    );
+  };
+
   switch (action.type) {
     case 'SET_DATA':
       return { ...state, data: action.payload, isLoading: false };
     case 'SET_FIELDS':
       return { ...state, fields: action.payload };
-    case 'ASSIGN_FIELD':
-      return {
-        ...state,
-        encodings: {
-          ...state.encodings,
-          [action.channel]: {
-            field: action.field,
-            aggregate: null,
-            timeUnit: action.field.type === 'temporal' ? 'year' : null,
-            sort: null
-          }
-        },
+    case 'ASSIGN_FIELD': {
+      const targetId = action.chartId || state.activeChartId;
+      const chart = state.charts.find(c => c.id === targetId);
+      if (!chart) return state;
+      
+      const newEncodings = {
+        ...chart.encodings,
+        [action.channel]: {
+          field: action.field,
+          aggregate: null,
+          timeUnit: action.field.type === 'temporal' ? 'year' : null,
+          sort: null
+        }
       };
+      return { ...state, charts: updateChart(action.chartId, { encodings: newEncodings }) };
+    }
     case 'REMOVE_FIELD': {
-      const newEncodings = { ...state.encodings };
+      const targetId = action.chartId || state.activeChartId;
+      const chart = state.charts.find(c => c.id === targetId);
+      if (!chart) return state;
+
+      const newEncodings = { ...chart.encodings };
       delete newEncodings[action.channel];
-      return { ...state, encodings: newEncodings };
+      return { ...state, charts: updateChart(action.chartId, { encodings: newEncodings }) };
     }
     case 'SET_AGGREGATE': {
-      const existingConfig = state.encodings[action.channel];
-      if (!existingConfig) return state;
-      return {
-        ...state,
-        encodings: {
-          ...state.encodings,
-          [action.channel]: { ...existingConfig, aggregate: action.aggregate },
-        },
+      const targetId = action.chartId || state.activeChartId;
+      const chart = state.charts.find(c => c.id === targetId);
+      if (!chart || !chart.encodings[action.channel]) return state;
+
+      const newEncodings = {
+        ...chart.encodings,
+        [action.channel]: { ...chart.encodings[action.channel]!, aggregate: action.aggregate },
       };
+      return { ...state, charts: updateChart(action.chartId, { encodings: newEncodings }) };
     }
     case 'SET_TIME_UNIT': {
-      const existingConfig = state.encodings[action.channel];
-      if (!existingConfig) return state;
-      return {
-        ...state,
-        encodings: {
-          ...state.encodings,
-          [action.channel]: { ...existingConfig, timeUnit: action.timeUnit },
-        },
+      const targetId = action.chartId || state.activeChartId;
+      const chart = state.charts.find(c => c.id === targetId);
+      if (!chart || !chart.encodings[action.channel]) return state;
+
+      const newEncodings = {
+        ...chart.encodings,
+        [action.channel]: { ...chart.encodings[action.channel]!, timeUnit: action.timeUnit },
       };
+      return { ...state, charts: updateChart(action.chartId, { encodings: newEncodings }) };
     }
     case 'CLEAR_ALL':
-      return { ...state, encodings: {}, filters: [], chartTitle: null, currentProjectId: null };
+      return { 
+        ...state, 
+        charts: initialState.charts, 
+        activeChartId: initialState.activeChartId,
+        filters: [], 
+        currentProjectId: null 
+      };
     case 'SET_LOADING':
       return { ...state, isLoading: action.payload };
     case 'SET_ERROR':
@@ -73,54 +100,60 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case 'TOGGLE_FIELD_TYPE': {
       const newFields = state.fields.map((field) => {
         if (field.name === action.fieldName) {
-          // Toggle between ordinal and nominal
           const newType: FieldType = field.type === 'ordinal' ? 'nominal' : 'ordinal';
           return { ...field, type: newType };
         }
         return field;
       });
-      // Also update any encodings that use this field
-      const newEncodings = { ...state.encodings };
-      for (const [channel, config] of Object.entries(newEncodings)) {
-        if (config && config.field.name === action.fieldName) {
-          const newType: FieldType = config.field.type === 'ordinal' ? 'nominal' : 'ordinal';
-          newEncodings[channel as EncodingChannel] = {
-            ...config,
-            field: { ...config.field, type: newType }
-          };
+
+      // Update all charts that use this field
+      const newCharts = state.charts.map(chart => {
+        const newEncodings = { ...chart.encodings };
+        let changed = false;
+        for (const [channel, config] of Object.entries(newEncodings)) {
+          if (config && config.field.name === action.fieldName) {
+            const newType: FieldType = config.field.type === 'ordinal' ? 'nominal' : 'ordinal';
+            newEncodings[channel as EncodingChannel] = {
+              ...config,
+              field: { ...config.field, type: newType }
+            };
+            changed = true;
+          }
         }
-      }
-      return { ...state, fields: newFields, encodings: newEncodings };
+        return changed ? { ...chart, encodings: newEncodings } : chart;
+      });
+
+      return { ...state, fields: newFields, charts: newCharts };
     }
     case 'RESET_FOR_NEW_DATA':
       return {
         ...state,
         data: [],
         fields: [],
-        encodings: {},
+        charts: initialState.charts,
+        activeChartId: initialState.activeChartId,
         filters: [],
-        markType: 'auto',
-        chartTitle: null,
         isLoading: true,
         error: null,
       };
     case 'SET_MARK_TYPE':
-      return { ...state, markType: action.markType };
+      return { ...state, charts: updateChart(action.chartId, { markType: action.markType }) };
     case 'SET_CHART_TITLE':
-      return { ...state, chartTitle: action.title };
+      return { ...state, charts: updateChart(action.chartId, { chartTitle: action.title }) };
+    case 'SET_COLOR_SCHEME':
+      return { ...state, charts: updateChart(action.chartId, { colorScheme: action.colorScheme }) };
     case 'SET_SORT': {
-      const existingConfig = state.encodings[action.channel];
-      if (!existingConfig) return state;
-      return {
-        ...state,
-        encodings: {
-          ...state.encodings,
-          [action.channel]: { ...existingConfig, sort: action.sort },
-        },
+      const targetId = action.chartId || state.activeChartId;
+      const chart = state.charts.find(c => c.id === targetId);
+      if (!chart || !chart.encodings[action.channel]) return state;
+
+      const newEncodings = {
+        ...chart.encodings,
+        [action.channel]: { ...chart.encodings[action.channel]!, sort: action.sort },
       };
+      return { ...state, charts: updateChart(action.chartId, { encodings: newEncodings }) };
     }
     case 'ADD_FILTER': {
-      // Prevent duplicate filters for same field
       if (state.filters.some(f => f.fieldName === action.filter.fieldName)) {
         return state;
       }
@@ -143,18 +176,41 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case 'CLEAR_FILTERS':
       return { ...state, filters: [] };
     case 'SAVE_PROJECT': {
-      // This is now just a state update after persistence is handled in the helper
       return { ...state, projects: action.projects, currentProjectId: action.id };
     }
-    case 'LOAD_PROJECT':
+    case 'LOAD_PROJECT': {
+      const project = action.project;
+      
+      // Migration: If it's an old project format, convert to multi-chart format
+      let charts: ChartConfig[];
+      let activeChartId: string | null;
+
+      if ('charts' in project && Array.isArray(project.charts)) {
+        charts = project.charts;
+        activeChartId = project.activeChartId;
+      } else {
+        // Fallback for old single-chart projects
+        const oldProject = project as any;
+        charts = [
+          {
+            id: 'default',
+            encodings: oldProject.encodings || {},
+            markType: oldProject.markType || 'auto',
+            chartTitle: oldProject.chartTitle || null,
+            colorScheme: oldProject.colorScheme || 'default',
+          }
+        ];
+        activeChartId = 'default';
+      }
+
       return {
         ...state,
-        encodings: action.project.encodings,
-        filters: action.project.filters,
-        markType: action.project.markType,
-        chartTitle: action.project.chartTitle,
-        currentProjectId: action.project.id,
+        charts,
+        activeChartId,
+        filters: project.filters || [],
+        currentProjectId: project.id,
       };
+    }
     case 'DELETE_PROJECT':
       return {
         ...state,
@@ -165,6 +221,50 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, projects: action.projects };
     case 'SET_VIEW_MODE':
       return { ...state, viewMode: action.mode };
+    case 'ADD_CHART': {
+      const newChart: ChartConfig = {
+        id: crypto.randomUUID(),
+        encodings: {},
+        markType: 'auto',
+        chartTitle: null,
+        colorScheme: 'default',
+      };
+      return {
+        ...state,
+        charts: [...state.charts, newChart],
+        activeChartId: newChart.id,
+        viewMode: 'chart', // Switch to edit mode for the new chart
+      };
+    }
+    case 'REMOVE_CHART': {
+      if (state.charts.length <= 1) return state;
+      const newCharts = state.charts.filter(c => c.id !== action.id);
+      let newActiveId = state.activeChartId;
+      if (state.activeChartId === action.id) {
+        newActiveId = newCharts[0].id;
+      }
+      return {
+        ...state,
+        charts: newCharts,
+        activeChartId: newActiveId,
+      };
+    }
+    case 'SET_ACTIVE_CHART':
+      return { ...state, activeChartId: action.id };
+    case 'DUPLICATE_CHART': {
+      const chartToCopy = state.charts.find(c => c.id === action.id);
+      if (!chartToCopy) return state;
+      const newChart: ChartConfig = {
+        ...chartToCopy,
+        id: crypto.randomUUID(),
+        chartTitle: chartToCopy.chartTitle ? `${chartToCopy.chartTitle} (Copy)` : null,
+      };
+      return {
+        ...state,
+        charts: [...state.charts, newChart],
+        activeChartId: newChart.id,
+      };
+    }
     default:
       return state;
   }
@@ -172,13 +272,14 @@ function appReducer(state: AppState, action: AppAction): AppState {
 
 interface AppContextType {
   state: AppState;
-  assignField: (channel: EncodingChannel, field: DetectedField) => void;
-  removeField: (channel: EncodingChannel) => void;
-  setAggregate: (channel: EncodingChannel, aggregate: AggregateType) => void;
-  setTimeUnit: (channel: EncodingChannel, timeUnit: TimeUnit) => void;
-  setSort: (channel: EncodingChannel, sort: SortOrder) => void;
-  setMarkType: (markType: MarkType) => void;
-  setChartTitle: (title: string | null) => void;
+  assignField: (channel: EncodingChannel, field: DetectedField, chartId?: string) => void;
+  removeField: (channel: EncodingChannel, chartId?: string) => void;
+  setAggregate: (channel: EncodingChannel, aggregate: AggregateType, chartId?: string) => void;
+  setTimeUnit: (channel: EncodingChannel, timeUnit: TimeUnit, chartId?: string) => void;
+  setSort: (channel: EncodingChannel, sort: SortOrder, chartId?: string) => void;
+  setMarkType: (markType: MarkType, chartId?: string) => void;
+  setChartTitle: (title: string | null, chartId?: string) => void;
+  setColorScheme: (colorScheme: ColorScheme, chartId?: string) => void;
   clearAll: () => void;
   toggleFieldType: (fieldName: string) => void;
   loadData: (data: Record<string, unknown>[]) => void;
@@ -190,6 +291,10 @@ interface AppContextType {
   loadProject: (id: string) => void;
   deleteProject: (id: string) => void;
   setViewMode: (mode: ViewMode) => void;
+  addChart: () => void;
+  removeChart: (id: string) => void;
+  setActiveChart: (id: string) => void;
+  duplicateChart: (id: string) => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -209,32 +314,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const assignField = (channel: EncodingChannel, field: DetectedField) => {
-    dispatch({ type: 'ASSIGN_FIELD', channel, field });
+  const assignField = (channel: EncodingChannel, field: DetectedField, chartId?: string) => {
+    dispatch({ type: 'ASSIGN_FIELD', channel, field, chartId });
   };
 
-  const removeField = (channel: EncodingChannel) => {
-    dispatch({ type: 'REMOVE_FIELD', channel });
+  const removeField = (channel: EncodingChannel, chartId?: string) => {
+    dispatch({ type: 'REMOVE_FIELD', channel, chartId });
   };
 
-  const setAggregate = (channel: EncodingChannel, aggregate: AggregateType) => {
-    dispatch({ type: 'SET_AGGREGATE', channel, aggregate });
+  const setAggregate = (channel: EncodingChannel, aggregate: AggregateType, chartId?: string) => {
+    dispatch({ type: 'SET_AGGREGATE', channel, aggregate, chartId });
   };
 
-  const setTimeUnit = (channel: EncodingChannel, timeUnit: TimeUnit) => {
-    dispatch({ type: 'SET_TIME_UNIT', channel, timeUnit });
+  const setTimeUnit = (channel: EncodingChannel, timeUnit: TimeUnit, chartId?: string) => {
+    dispatch({ type: 'SET_TIME_UNIT', channel, timeUnit, chartId });
   };
 
-  const setSort = (channel: EncodingChannel, sort: SortOrder) => {
-    dispatch({ type: 'SET_SORT', channel, sort });
+  const setSort = (channel: EncodingChannel, sort: SortOrder, chartId?: string) => {
+    dispatch({ type: 'SET_SORT', channel, sort, chartId });
   };
 
-  const setMarkType = (markType: MarkType) => {
-    dispatch({ type: 'SET_MARK_TYPE', markType });
+  const setMarkType = (markType: MarkType, chartId?: string) => {
+    dispatch({ type: 'SET_MARK_TYPE', markType, chartId });
   };
 
-  const setChartTitle = (title: string | null) => {
-    dispatch({ type: 'SET_CHART_TITLE', title });
+  const setChartTitle = (title: string | null, chartId?: string) => {
+    dispatch({ type: 'SET_CHART_TITLE', title, chartId });
+  };
+
+  const setColorScheme = (colorScheme: ColorScheme, chartId?: string) => {
+    dispatch({ type: 'SET_COLOR_SCHEME', colorScheme, chartId });
   };
 
   const clearAll = () => {
@@ -333,10 +442,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       id,
       name,
       updatedAt: Date.now(),
-      encodings: state.encodings,
+      charts: state.charts,
+      activeChartId: state.activeChartId,
       filters: state.filters,
-      markType: state.markType,
-      chartTitle: state.chartTitle,
     };
 
     persistence.saveProject(project);
@@ -348,7 +456,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const loadProject = (id: string) => {
     const project = persistence.getProject(id);
     if (project) {
-      dispatch({ type: 'LOAD_PROJECT', project });
+      dispatch({ type: 'LOAD_PROJECT', project: project as SavedProject });
     }
   };
 
@@ -357,6 +465,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'DELETE_PROJECT', id });
   };
 
+  const addChart = () => dispatch({ type: 'ADD_CHART' });
+  const removeChart = (id: string) => dispatch({ type: 'REMOVE_CHART', id });
+  const setActiveChart = (id: string) => dispatch({ type: 'SET_ACTIVE_CHART', id });
+  const duplicateChart = (id: string) => dispatch({ type: 'DUPLICATE_CHART', id });
+
   // Initial load of projects and session
   useEffect(() => {
     const metadata = persistence.getProjectsMetadata();
@@ -364,10 +477,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const lastSession = persistence.getLastSession();
     if (lastSession) {
+      // Small adaptation for potential old session format
+      const projectData = lastSession as any;
+      const charts = projectData.charts || [{
+        id: 'default',
+        encodings: projectData.encodings || {},
+        markType: projectData.markType || 'auto',
+        chartTitle: projectData.chartTitle || null,
+        colorScheme: projectData.colorScheme || 'default',
+      }];
+      
       dispatch({
         type: 'LOAD_PROJECT',
         project: {
-          ...lastSession,
+          ...projectData,
+          charts,
+          activeChartId: projectData.activeChartId || charts[0].id,
           name: 'Restored Session',
           updatedAt: Date.now(),
         } as SavedProject,
@@ -384,12 +509,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     persistence.saveLastSession({
       id: state.currentProjectId || 'temp-session',
-      encodings: state.encodings,
+      charts: state.charts,
+      activeChartId: state.activeChartId,
       filters: state.filters,
-      markType: state.markType,
-      chartTitle: state.chartTitle,
     });
-  }, [state.encodings, state.filters, state.markType, state.chartTitle]);
+  }, [state.charts, state.activeChartId, state.filters]);
 
   return (
     <AppContext.Provider
@@ -402,6 +526,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setSort,
         setMarkType,
         setChartTitle,
+        setColorScheme,
         clearAll,
         toggleFieldType,
         loadData,
@@ -413,6 +538,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         loadProject,
         deleteProject,
         setViewMode: (mode: ViewMode) => dispatch({ type: 'SET_VIEW_MODE', mode }),
+        addChart,
+        removeChart,
+        setActiveChart,
+        duplicateChart,
       }}
     >
       {children}

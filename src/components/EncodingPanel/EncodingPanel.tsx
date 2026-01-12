@@ -2,7 +2,25 @@ import { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { EncodingShelf } from './EncodingShelf';
 import { FilterPanel } from '../Filters/FilterPanel';
-import type { MarkType } from '../../types';
+import type { MarkType, ColorScheme } from '../../types';
+
+const COLOR_SCHEME_OPTIONS: { value: ColorScheme; label: string }[] = [
+  { value: 'default', label: 'Default Dark' },
+  { value: 'classic', label: 'Classic Light' },
+  { value: 'vibrant', label: 'Vibrant' },
+  { value: 'pastel', label: 'Pastel' },
+  { value: 'professional', label: 'Professional' },
+  { value: 'ocean', label: 'Ocean Blues' },
+  { value: 'forest', label: 'Forest Greens' },
+  { value: 'sunset', label: 'Sunset Orange' },
+  { value: 'purple-haze', label: 'Purple Haze' },
+  { value: 'viridis', label: 'Viridis' },
+  { value: 'magma', label: 'Magma' },
+  { value: 'inferno', label: 'Inferno' },
+  { value: 'plasma', label: 'Plasma' },
+  { value: 'neon', label: 'Neon Lights' },
+  { value: 'midnight', label: 'Midnight' },
+];
 
 const MARK_TYPE_OPTIONS: { value: MarkType; label: string; icon: string }[] = [
   { value: 'auto', label: 'Auto', icon: '✨' },
@@ -72,10 +90,11 @@ interface EncodingPanelProps {
 }
 
 export function EncodingPanel({ isCollapsed, onToggle }: EncodingPanelProps) {
-  const { clearAll, state, setMarkType } = useApp();
+  const { clearAll, state, setMarkType, setColorScheme } = useApp();
   const [hoveredClear, setHoveredClear] = useState(false);
 
-  const hasEncodings = Object.keys(state.encodings).length > 0;
+  const activeChart = state.charts.find(c => c.id === state.activeChartId) || state.charts[0];
+  const hasEncodings = Object.keys(activeChart.encodings).length > 0;
 
   if (isCollapsed) {
     return (
@@ -302,14 +321,14 @@ export function EncodingPanel({ isCollapsed, onToggle }: EncodingPanelProps) {
                 justifyContent: 'center',
                 gap: '4px',
                 padding: '8px 4px',
-                backgroundColor: state.markType === option.value
+                backgroundColor: activeChart.markType === option.value
                   ? 'var(--color-accent-glow)'
                   : 'var(--color-bg-tertiary)',
-                border: `1px solid ${state.markType === option.value ? 'var(--color-accent)' : 'var(--color-border)'}`,
+                border: `1px solid ${activeChart.markType === option.value ? 'var(--color-accent)' : 'var(--color-border)'}`,
                 borderRadius: '6px',
                 cursor: 'pointer',
                 transition: 'all 0.15s ease',
-                color: state.markType === option.value
+                color: activeChart.markType === option.value
                   ? 'var(--color-accent)'
                   : 'var(--color-text-secondary)',
               }}
@@ -369,6 +388,69 @@ export function EncodingPanel({ isCollapsed, onToggle }: EncodingPanelProps) {
           </div>
         ))}
 
+        {/* Color Scheme Selector */}
+        <div
+          style={{
+            animation: `fadeIn 0.4s ease-out ${SECTIONS.length * 0.1}s both`,
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              marginBottom: '12px',
+              paddingBottom: '8px',
+              borderBottom: '1px solid var(--color-border)',
+            }}
+          >
+            <span style={{ color: 'var(--color-accent)', opacity: 0.8 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 2a10 10 0 0 0-10 10c0 5.523 4.477 10 10 10s10-4.477 10-10S17.523 2 12 2z" />
+                <path d="M12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12z" />
+              </svg>
+            </span>
+            <h3
+              style={{
+                fontSize: '10px',
+                fontWeight: 600,
+                color: 'var(--color-text-secondary)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.1em',
+                margin: 0,
+              }}
+            >
+              Color Scheme
+            </h3>
+          </div>
+          <select
+            value={activeChart.colorScheme}
+            onChange={(e) => setColorScheme(e.target.value as ColorScheme)}
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              backgroundColor: 'var(--color-bg-tertiary)',
+              border: '1px solid var(--color-border)',
+              borderRadius: '8px',
+              fontSize: '13px',
+              color: 'var(--color-text-primary)',
+              outline: 'none',
+              cursor: 'pointer',
+              appearance: 'none',
+              backgroundImage: 'url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'rgba(250, 250, 250, 0.4)\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3E%3Cpolyline points=\'6 9 12 15 18 9\'%3E%3C/polyline%3E%3C/svg%3E")',
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: 'right 12px center',
+            }}
+          >
+            {COLOR_SCHEME_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
         {/* Filters section */}
         <FilterPanel />
       </div>
@@ -406,7 +488,7 @@ export function EncodingPanel({ isCollapsed, onToggle }: EncodingPanelProps) {
           }}
         >
           {hasEncodings
-            ? `${Object.keys(state.encodings).length} active`
+            ? `${Object.keys(activeChart.encodings).length} active`
             : 'No encodings'}
         </span>
       </div>

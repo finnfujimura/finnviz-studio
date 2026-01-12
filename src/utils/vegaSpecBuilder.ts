@@ -1,5 +1,110 @@
-import type { TopLevelSpec } from 'vega-lite';
-import type { EncodingState, EncodingFieldConfig, MarkType, AggregateType, FilterConfig, RangeFilterValue, SelectionFilterValue } from '../types';
+import type { TopLevelSpec, Config } from 'vega-lite';
+import type { EncodingState, EncodingFieldConfig, MarkType, AggregateType, FilterConfig, RangeFilterValue, SelectionFilterValue, ColorScheme } from '../types';
+
+// Theme configurations for different color schemes
+interface ThemeConfig {
+  isDark: boolean;
+  scheme: string;
+}
+
+const THEME_CONFIGS: Record<ColorScheme, ThemeConfig | null> = {
+  'default': null,
+  'classic': { isDark: false, scheme: 'tableau10' },
+  'vibrant': { isDark: false, scheme: 'set1' },
+  'pastel': { isDark: false, scheme: 'pastel1' },
+  'professional': { isDark: false, scheme: 'paired' },
+  'ocean': { isDark: false, scheme: 'tableau20' },
+  'forest': { isDark: false, scheme: 'accent' },
+  'sunset': { isDark: false, scheme: 'set2' },
+  'purple-haze': { isDark: true, scheme: 'set3' },
+  'viridis': { isDark: true, scheme: 'viridis' },
+  'magma': { isDark: true, scheme: 'magma' },
+  'inferno': { isDark: true, scheme: 'inferno' },
+  'plasma': { isDark: true, scheme: 'plasma' },
+  'neon': { isDark: true, scheme: 'turbo' },
+  'midnight': { isDark: true, scheme: 'dark2' },
+};
+
+function buildThemeConfig(colorScheme: ColorScheme): Config {
+  const themeConfig = THEME_CONFIGS[colorScheme];
+
+  if (!themeConfig) {
+    // Default dark theme
+    return {};
+  }
+
+  const { isDark, scheme } = themeConfig;
+
+  // Custom mark colors for each theme to make them more distinct
+  const markColors: Record<string, string> = {
+    'classic': '#4c78a8',
+    'vibrant': '#e45756',
+    'pastel': '#aec7e8',
+    'professional': '#7f7f7f',
+    'ocean': '#1f77b4',
+    'forest': '#7fbc41',
+    'sunset': '#fc8d62',
+    'purple-haze': '#b3b3cc',
+    'viridis': '#440154',
+    'magma': '#000004',
+    'inferno': '#000004',
+    'plasma': '#0d0887',
+    'neon': '#23aaff',
+    'midnight': '#1b9e77',
+  };
+
+  if (isDark) {
+    // Dark theme configuration
+    return {
+      background: '#0a0a0a',
+      range: {
+        category: { scheme }
+      },
+      mark: {
+        color: markColors[colorScheme] || '#8b5cf6',
+      },
+      axis: {
+        domainColor: '#333333',
+        gridColor: '#1a1a1a',
+        tickColor: '#333333',
+        labelColor: '#a0a0a0',
+        titleColor: '#d0d0d0',
+      },
+      legend: {
+        labelColor: '#a0a0a0',
+        titleColor: '#d0d0d0',
+      },
+      title: {
+        color: '#ffffff',
+      },
+    };
+  } else {
+    // Light theme configuration
+    return {
+      background: '#ffffff',
+      range: {
+        category: { scheme }
+      },
+      mark: {
+        color: markColors[colorScheme] || '#4c78a8',
+      },
+      axis: {
+        domainColor: '#888888',
+        gridColor: '#f0f0f0',
+        tickColor: '#888888',
+        labelColor: '#444444',
+        titleColor: '#222222',
+      },
+      legend: {
+        labelColor: '#444444',
+        titleColor: '#222222',
+      },
+      title: {
+        color: '#000000',
+      },
+    };
+  }
+}
 
 // Format field name for display (replace underscores with spaces)
 function formatFieldName(name: string): string {
@@ -177,7 +282,8 @@ export function buildVegaSpec(
   data: Record<string, unknown>[],
   markType: MarkType = 'auto',
   title?: string | null,
-  filters?: FilterConfig[]
+  filters?: FilterConfig[],
+  colorScheme: ColorScheme = 'default'
 ): TopLevelSpec | null {
   if (!encodings.x && !encodings.y) {
     return null;
@@ -197,7 +303,15 @@ export function buildVegaSpec(
     encoding.y = buildChannelEncoding(encodings.y);
   }
   if (encodings.color) {
-    encoding.color = buildChannelEncoding(encodings.color);
+    const colorEncoding = buildChannelEncoding(encodings.color);
+    // Apply color scheme to the encoding if not default
+    if (colorScheme !== 'default') {
+      const themeConfig = THEME_CONFIGS[colorScheme];
+      if (themeConfig) {
+        (colorEncoding as any).scale = { scheme: themeConfig.scheme };
+      }
+    }
+    encoding.color = colorEncoding;
   }
   if (encodings.size) {
     encoding.size = buildChannelEncoding(encodings.size);
@@ -215,6 +329,9 @@ export function buildVegaSpec(
   // Build filter transforms if filters are provided
   const transforms = filters ? buildFilterTransforms(filters) : [];
 
+  // Build theme configuration based on color scheme
+  const config = buildThemeConfig(colorScheme);
+
   const spec: TopLevelSpec = {
     $schema: 'https://vega.github.io/schema/vega-lite/v6.json',
     data: { values: data },
@@ -224,6 +341,7 @@ export function buildVegaSpec(
     width: 'container',
     height: 400,
     ...(chartTitle && { title: chartTitle }),
+    ...(Object.keys(config).length > 0 && { config }),
   };
 
   return spec;
