@@ -22,10 +22,15 @@ This is a drag-and-drop data visualization tool (similar to Tableau) built with 
 
 1. **Data loading**: `AppContext.tsx` loads `superstore.json` on mount (or user uploads CSV/XLSX/XLS) and runs field detection
 2. **Field detection**: `fieldDetection.ts` analyzes data to infer field types (quantitative, nominal, ordinal, temporal)
-   - Quantitative: Numeric fields with >20 unique values
-   - Ordinal: Numeric fields with ≤20 unique values
-   - Temporal: Date fields (detected via patterns or `Date.parse`)
-   - Nominal: String fields
+   - **Quantitative**: Numbers expressing magnitude (continuous measurements, amounts, etc.)
+   - **Ordinal**: Ranked categorical data (ratings, size categories, priority levels)
+   - **Temporal**: Date/time values matching strict ISO 8601 or common date patterns
+   - **Nominal**: Categories and identifiers (text, or numbers detected as IDs)
+   - **ID Detection**: Numeric fields are classified as nominal if:
+     - Field name matches ID patterns (ends with `_id`, `id`, `code`, `key`)
+     - Values are sequential integers or large ID-like numbers
+     - High cardinality with unique values
+   - **Strict Date Validation**: Only explicit date patterns are recognized (no loose Date.parse())
 3. **Drag-and-drop**: `FieldPill` components are draggable; `EncodingShelf` components are drop targets
 4. **Spec building**: When encodings change, `vegaSpecBuilder.ts` generates a Vega-Lite spec
 5. **Rendering**: `ChartView` uses `vega-embed` to render the spec
