@@ -23,7 +23,46 @@ function isTemporalField(values: unknown[]): boolean {
   return dateMatches.length >= stringValues.length * 0.8;
 }
 
-export function detectFieldType(values: unknown[]): FieldType {
+// Common ID field name patterns
+const ID_NAME_PATTERNS = [
+  /^id$/i,
+  /_id$/i,
+  /^.*_id$/i,
+  /^.*id$/i,
+  /code$/i,
+  /^key$/i,
+  /^.*_key$/i,
+];
+
+function hasIdFieldName(fieldName: string): boolean {
+  return ID_NAME_PATTERNS.some((pattern) => pattern.test(fieldName));
+}
+
+function looksLikeId(values: unknown[]): boolean {
+  const numericValues = values.filter((v): v is number => typeof v === 'number');
+  if (numericValues.length !== values.length) return false;
+
+  // Check if all integers
+  const allIntegers = numericValues.every((v) => Number.isInteger(v));
+  if (!allIntegers) return false;
+
+  // Check if values are sequential or nearly sequential (ID pattern)
+  const sorted = [...numericValues].sort((a, b) => a - b);
+  let gaps = 0;
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i] - sorted[i - 1] === 1) gaps++;
+  }
+  const sequentialRatio = gaps / (sorted.length - 1);
+  if (sequentialRatio > 0.7) return true;
+
+  // Check if values are very large AND sequential-ish (likely IDs, not meaningful quantities)
+  const avgValue = numericValues.reduce((sum, v) => sum + v, 0) / numericValues.length;
+  if (avgValue > 10000 && sequentialRatio > 0.3) return true;
+
+  return false;
+}
+
+export function detectFieldType(values: unknown[], fieldName?: string): FieldType {
   const nonNullValues = values.filter((v) => v !== null && v !== undefined && v !== '');
 
   if (nonNullValues.length === 0) return 'nominal';
@@ -32,6 +71,7 @@ export function detectFieldType(values: unknown[]): FieldType {
   const uniqueValues = new Set(sample);
   const uniqueCount = uniqueValues.size;
 
+  // Check for temporal fields first
   if (isTemporalField(sample)) {
     return 'temporal';
   }
@@ -42,6 +82,17 @@ export function detectFieldType(values: unknown[]): FieldType {
   const isNumeric = numericValues.length === sample.length;
 
   if (isNumeric) {
+    // Check if field name suggests it's an ID
+    if (fieldName && hasIdFieldName(fieldName)) {
+      return 'nominal';
+    }
+
+    // Check if values look like IDs
+    if (looksLikeId(sample)) {
+      return 'nominal';
+    }
+
+    // Distinguish ordinal from quantitative
     if (uniqueCount <= CATEGORICAL_THRESHOLD) {
       return 'ordinal';
     }
@@ -58,7 +109,7 @@ export function detectAllFields(data: Record<string, unknown>[]): DetectedField[
 
   return fieldNames.map((name) => {
     const values = data.map((row) => row[name]);
-    const type = detectFieldType(values);
+    const type = detectFieldType(values, name);
     const uniqueCount = new Set(values.filter((v) => v != null)).size;
 
     return {
