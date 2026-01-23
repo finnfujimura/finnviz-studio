@@ -88,4 +88,26 @@ describe('fieldDetection', () => {
       expect(detectFieldType(values)).toBe('quantitative');
     });
   });
+
+  describe('detectFieldType - ordinal', () => {
+    it('should detect rating scales as ordinal', () => {
+      const values = [1, 2, 3, 4, 5, 3, 4, 2, 5, 1];
+      expect(detectFieldType(values)).toBe('ordinal');
+    });
+
+    it('should detect size categories as ordinal', () => {
+      const values = ['Small', 'Medium', 'Large', 'Small', 'Medium'];
+      expect(detectFieldType(values)).toBe('ordinal');
+    });
+
+    it('should detect priority levels as ordinal', () => {
+      const values = ['Low', 'Medium', 'High', 'Critical'];
+      expect(detectFieldType(values)).toBe('ordinal');
+    });
+
+    it('should detect small integer ranges as ordinal', () => {
+      const values = [1, 2, 3, 1, 2, 3, 2, 1, 3];
+      expect(detectFieldType(values)).toBe('ordinal');
+    });
+  });
 });
