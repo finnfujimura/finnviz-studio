@@ -110,4 +110,30 @@ describe('fieldDetection', () => {
       expect(detectFieldType(values)).toBe('ordinal');
     });
   });
+
+  describe('detectFieldType - edge cases', () => {
+    it('should handle empty arrays', () => {
+      expect(detectFieldType([])).toBe('nominal');
+    });
+
+    it('should handle all null values', () => {
+      const values = [null, null, null];
+      expect(detectFieldType(values)).toBe('nominal');
+    });
+
+    it('should handle mixed nulls and values', () => {
+      const values = [null, 'A', null, 'B', 'C'];
+      expect(detectFieldType(values)).toBe('nominal');
+    });
+
+    it('should handle single value', () => {
+      expect(detectFieldType([42])).toBe('quantitative');
+    });
+
+    it('should sample large datasets efficiently', () => {
+      const values = Array.from({ length: 10000 }, (_, i) => i);
+      const result = detectFieldType(values);
+      expect(['quantitative', 'nominal']).toContain(result);
+    });
+  });
 });
